@@ -41,6 +41,11 @@ class KeywordParser:
         # These use escaped double quotes in CSV format
         double_quote_pattern = re.compile(r'""([^"]+)""')
         for match in double_quote_pattern.finditer(text):
+            # Skip if this is an attribute value (preceded by colon)
+            # e.g., attribute:""value"" should not extract "value"
+            if match.start() > 0 and text[match.start() - 1] == ':':
+                continue
+
             phrase = match.group(1).strip()
             if phrase and self._is_translatable_phrase(phrase):
                 results.append((match.group(0), phrase, 'double_quoted'))
@@ -52,6 +57,11 @@ class KeywordParser:
         for match in single_quote_pattern.finditer(text):
             # Skip if overlaps with already matched span
             if self._overlaps(match.start(), match.end(), matched_spans):
+                continue
+
+            # Skip if this is an attribute value (preceded by colon)
+            # e.g., _verbatimtype:"general_comments" should not extract "general_comments"
+            if match.start() > 0 and text[match.start() - 1] == ':':
                 continue
 
             phrase = match.group(1).strip()

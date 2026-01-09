@@ -330,6 +330,6 @@ st.divider()
 st.markdown("""
 <div style='text-align: center; color: gray; font-size: 0.8em;'>
     Built with Streamlit | Translation by Claude, OpenAI, Gemini, or DeepL<br>
-    <strong>v1.6.1</strong> - Fixed Category 4+ support, skip attribute-only rows
+    <strong>v1.7</strong> - Fixed attribute:"value" patterns being incorrectly translated
 </div>
 """, unsafe_allow_html=True)
