@@ -50,7 +50,11 @@ class CSVProcessor:
     ]
 
     # Category columns (not translated, cleared on new rows)
-    CATEGORY_COLUMNS = ['Category 1', 'Category 2', 'Category 3']
+    # Support up to 10 levels to handle any model structure
+    CATEGORY_COLUMNS = [
+        'Category 1', 'Category 2', 'Category 3', 'Category 4', 'Category 5',
+        'Category 6', 'Category 7', 'Category 8', 'Category 9', 'Category 10'
+    ]
 
     # Node-level columns that should NOT be copied to translated rule pages
     NODE_LEVEL_COLUMNS = ['Smart Other', 'Description']
@@ -304,6 +308,24 @@ class CSVProcessor:
                     return True
         return False
 
+    def _has_translatable_content(self, row: pd.Series) -> bool:
+        """
+        Check if row has actual translatable content (not just attributes).
+
+        Returns True only if there are phrases that can be translated,
+        not just structured attributes like _verbatimtype:clientverbatimcall.
+        """
+        for col in self.KEYWORD_COLUMNS:
+            if col in row.index:
+                val = row[col]
+                if pd.notna(val) and str(val).strip():
+                    # Use the parser to extract translatable phrases
+                    extractions = self.parser.extract_translatable_phrases(str(val))
+                    if extractions:
+                        # Found at least one translatable phrase
+                        return True
+        return False
+
     def _build_category_context(self, df: pd.DataFrame, row_groups: List[Dict]) -> str:
         """Build context string about categories for LLM translation."""
         categories = []
@@ -348,21 +370,29 @@ class CSVProcessor:
                 new_rows.append(df.loc[cat_row_idx].copy())
                 processed_indices.add(cat_row_idx)
 
-            # Add all original rule rows with English language attribute
+            # Track which rows have translatable content for this group
+            rows_with_translatable_content = []
+
+            # Add all original rule rows
             for row_idx in group['rule_rows']:
                 original_row = df.loc[row_idx].copy()
-                original_row = self._add_language_attribute(original_row, 'EN')
+                row_has_translatable = self._has_translatable_content(df.loc[row_idx])
+
+                # Only add language attribute if row has translatable content
+                if row_has_translatable:
+                    original_row = self._add_language_attribute(original_row, 'EN')
+                    rows_with_translatable_content.append(row_idx)
+
                 new_rows.append(original_row)
                 processed_indices.add(row_idx)
 
-            # Add translated versions of rule rows with target language attribute
-            if group['has_rules']:
-                for row_idx in group['rule_rows']:
-                    translated_row = self._translate_row(
-                        df.loc[row_idx], translations
-                    )
-                    translated_row = self._add_language_attribute(translated_row, target_lang)
-                    new_rows.append(translated_row)
+            # Add translated versions ONLY for rows that have translatable content
+            for row_idx in rows_with_translatable_content:
+                translated_row = self._translate_row(
+                    df.loc[row_idx], translations
+                )
+                translated_row = self._add_language_attribute(translated_row, target_lang)
+                new_rows.append(translated_row)
 
         # Add any rows that weren't part of groups
         for idx in df.index:
